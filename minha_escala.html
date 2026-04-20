@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d1b2a">
+<title>Minha Escala · IFA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;700&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --ink: #0d1b2a;
+    --ink-2: #1b2a3d;
+    --paper: #f4f1ea;
+    --paper-2: #ebe6db;
+    --accent: #c8553d;
+    --accent-soft: #e8a598;
+    --green: #2d5f3f;
+    --amber: #b8860b;
+    --rule: rgba(13,27,42,0.12);
+    --shadow: 0 2px 24px rgba(13,27,42,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { background: var(--paper); color: var(--ink); font-family: 'Inter Tight', sans-serif; min-height: 100vh; }
+  body {
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(200,85,61,0.06) 0%, transparent 40%),
+      radial-gradient(circle at 80% 90%, rgba(13,27,42,0.05) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  /* Topbar */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--ink); color: var(--paper);
+    padding: 14px 20px 12px;
+    border-bottom: 3px solid var(--accent);
+  }
+  .topbar-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .brand {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 22px; letter-spacing: -0.5px;
+    font-style: italic;
+  }
+  .brand::first-letter { color: var(--accent-soft); }
+  .brand-sub { font-family: 'JetBrains Mono', monospace; font-size: 10px; opacity: 0.6; letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+  .date-badge {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    background: rgba(244,241,234,0.1); padding: 6px 10px; border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  /* Upload zone */
+  .upload-zone {
+    margin: 24px 16px; padding: 28px 20px;
+    border: 2px dashed var(--rule);
+    border-radius: 4px; text-align: center;
+    background: rgba(255,255,255,0.4);
+    transition: all 0.2s ease;
+  }
+  .upload-zone.drag { border-color: var(--accent); background: rgba(200,85,61,0.05); }
+  .upload-zone h2 { font-family: 'Fraunces', serif; font-weight: 500; font-size: 20px; margin-bottom: 8px; }
+  .upload-zone p { font-size: 13px; color: var(--ink-2); opacity: 0.7; margin-bottom: 16px; line-height: 1.5; }
+  .btn {
+    display: inline-block; background: var(--ink); color: var(--paper);
+    padding: 12px 24px; border-radius: 3px; font-weight: 600;
+    font-size: 14px; border: none; cursor: pointer;
+    font-family: 'Inter Tight', sans-serif; letter-spacing: 0.3px;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+  input[type=file] { display: none; }
+
+  /* Sigla input */
+  .sigla-row { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 14px; }
+  .sigla-row label { font-size: 11px; font-family: 'JetBrains Mono', monospace; text-transform: uppercase; opacity: 0.6; letter-spacing: 1px; }
+  .sigla-input {
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 16px; padding: 6px 10px; width: 80px; text-align: center;
+    border: 1px solid var(--rule); border-radius: 3px;
+    background: var(--paper); color: var(--ink); text-transform: uppercase;
+  }
+
+  /* Header do dia */
+  .day-header {
+    padding: 28px 20px 0;
+  }
+  .day-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; }
+  .day-date {
+    font-family: 'Fraunces', serif; font-weight: 500; font-size: 32px;
+    line-height: 1; letter-spacing: -1px;
+  }
+  .day-weekday { font-style: italic; color: var(--accent); }
+  .day-meta { display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+  .meta-chip {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    padding: 5px 10px; border-radius: 3px; background: var(--ink); color: var(--paper);
+    letter-spacing: 0.5px;
+  }
+  .meta-chip.soft { background: var(--paper-2); color: var(--ink); }
+  .meta-chip.alert { background: var(--accent); color: var(--paper); }
+
+  /* Seção */
+  .section { padding: 28px 20px 0; }
+  .section-head {
+    display: flex; align-items: baseline; gap: 10px; margin-bottom: 16px;
+    border-bottom: 1px solid var(--rule); padding-bottom: 10px;
+  }
+  .section-num {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    color: var(--accent); font-weight: 700;
+  }
+  .section-title {
+    font-family: 'Fraunces', serif; font-weight: 600; font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+  .section-count {
+    font-family: 'JetBrains Mono', monospace; font-size: 11px;
+    margin-left: auto; opacity: 0.5;
+  }
+
+  /* Card de cirurgia */
+  .surgery {
+    background: #fff;
+    border-radius: 6px; margin-bottom: 12px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    border-left: 4px solid var(--ink);
+    position: relative;
+  }
+  .surgery.is-mine { border-left-color: var(--accent); }
+  .surgery.is-plantao { border-left-color: var(--green); }
+  .surgery-top {
+    display: flex; gap: 14px; padding: 14px 16px 10px; align-items: flex-start;
+  }
+  .surg-time {
+    font-family: 'JetBrains Mono', monospace; font-weight: 700;
+    font-size: 15px; line-height: 1.2; white-space: nowrap;
+  }
+  .surg-time .end { font-size: 11px; opacity: 0.5; display: block; margin-top: 2px; }
+  .surg-body { flex: 1; min-width: 0; }
+  .surg-hospital {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 700;
+    background: var(--ink); color: var(--paper); padding: 4px 10px;
+    border-radius: 2px; letter-spacing: 1.2px; margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .surgery.is-mine .surg-hospital { background: var(--accent); }
+  .surg-location { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 8px; }
+  .surg-sala {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600;
+    background: var(--paper-2); color: var(--ink); padding: 4px 10px;
+    border-radius: 2px; letter-spacing: 0.5px;
+    border: 1px solid var(--rule);
+  }
+  .surg-sala::before { content: "▸ sala "; opacity: 0.5; font-weight: 400; }
+  .surg-room { font-family: 'JetBrains Mono', monospace; font-size: 10px; opacity: 0.55; }
+  .surg-proc {
+    font-size: 15px; line-height: 1.35; font-weight: 500;
+    margin-bottom: 6px; color: var(--ink);
+  }
+  .surg-patient {
+    font-family: 'Fraunces', serif; font-style: italic; font-size: 13px;
+    opacity: 0.75; margin-bottom: 8px;
+  }
+  .surg-meta { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    padding: 2px 7px; border-radius: 2px; background: var(--paper-2);
+    letter-spacing: 0.5px;
+  }
+  .tag-role { background: var(--ink); color: var(--paper); }
+  .tag-role.mine { background: var(--accent); color: var(--paper); }
+  .tag-dur { background: transparent; border: 1px solid var(--rule); }
+  .surg-obs {
+    margin-top: 8px; padding: 8px 10px; background: rgba(184,134,11,0.08);
+    border-left: 2px solid var(--amber); font-size: 12px; line-height: 1.45;
+    border-radius: 0 3px 3px 0;
+  }
+  .surg-obs strong { text-transform: uppercase; font-size: 10px; letter-spacing: 1px; color: var(--amber); }
+  .ficha-link {
+    display: inline-block; margin-top: 8px; font-size: 11px;
+    font-family: 'JetBrains Mono', monospace; color: var(--accent);
+    text-decoration: none; padding: 4px 8px; border: 1px solid var(--accent);
+    border-radius: 2px;
+  }
+
+  /* Avisos / Pedidos */
+  .bullet-list { list-style: none; }
+  .bullet-list li {
+    padding: 10px 0 10px 22px; position: relative;
+    font-size: 14px; line-height: 1.5;
+    border-bottom: 1px dashed var(--rule);
+  }
+  .bullet-list li::before {
+    content: "▸"; position: absolute; left: 4px; top: 10px;
+    color: var(--accent); font-size: 12px;
+  }
+  .bullet-list li.highlight {
+    background: rgba(200,85,61,0.06);
+    padding-left: 28px; padding-right: 12px;
+    border-radius: 3px; border-bottom: none;
+    margin: 4px 0;
+  }
+  .bullet-list li.highlight::before { left: 10px; }
+
+  /* Empty state de cirurgias */
+  .empty-surg {
+    background: linear-gradient(135deg, rgba(45,95,63,0.08) 0%, rgba(45,95,63,0.02) 100%);
+    border: 1px solid rgba(45,95,63,0.2);
+    border-radius: 6px; padding: 20px; text-align: center;
+  }
+  .empty-surg h3 { font-family: 'Fraunces', serif; font-style: italic; font-weight: 500; font-size: 18px; margin-bottom: 6px; color: var(--green); }
+  .empty-surg p { font-size: 13px; opacity: 0.7; line-height: 1.5; }
+
+  /* Footer */
+  .foot {
+    margin-top: 40px; padding: 20px; text-align: center;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    opacity: 0.4; letter-spacing: 1px;
+  }
+  .foot .rule { width: 40px; height: 1px; background: var(--ink); margin: 0 auto 12px; opacity: 0.3; }
+
+  /* Reset button */
+  .reset-btn {
+    position: fixed; bottom: 20px; right: 20px;
+    background: var(--ink); color: var(--paper);
+    width: 44px; height: 44px; border-radius: 50%;
+    border: none; font-size: 18px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(13,27,42,0.25);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100;
+  }
+  .reset-btn.show { display: flex; }
+
+  /* Plantão hero */
+  .plantao-hero {
+    margin: 20px 20px 0;
+    background: var(--ink); color: var(--paper);
+    padding: 20px; border-radius: 6px;
+    position: relative; overflow: hidden;
+  }
+  .plantao-hero::before {
+    content: ""; position: absolute; top: -50%; right: -20%;
+    width: 200px; height: 200px;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 70%);
+    opacity: 0.3; pointer-events: none;
+  }
+  .plantao-kicker { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 3px; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; }
+  .plantao-title { font-family: 'Fraunces', serif; font-size: 26px; font-weight: 500; line-height: 1.1; letter-spacing: -0.5px; }
+  .plantao-title em { color: var(--accent-soft); font-style: italic; }
+  .plantao-detail { margin-top: 10px; font-size: 13px; opacity: 0.85; line-height: 1.5; }
+
+  /* Loading */
+  .loading { text-align: center; padding: 40px 20px; font-family: 'JetBrains Mono', monospace; font-size: 12px; opacity: 0.6; }
+
+  /* Stagger-in animation */
+  .fade-in { animation: fadeIn 0.5s ease both; }
+  .fade-in:nth-child(2) { animation-delay: 0.05s; }
+  .fade-in:nth-child(3) { animation-delay: 0.1s; }
+  .fade-in:nth-child(4) { animation-delay: 0.15s; }
+  .fade-in:nth-child(5) { animation-delay: 0.2s; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* Error */
+  .error-box {
+    margin: 20px; padding: 16px; background: rgba(200,85,61,0.1);
+    border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0;
+    font-size: 13px; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div>
+      <div class="brand">Minha Escala</div>
+      <div class="brand-sub">sane · centro cirúrgico</div>
+    </div>
+    <div class="date-badge" id="topDate">—</div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="upload-zone" id="uploadZone">
+    <h2>Carregar escala do dia</h2>
+    <p>Baixe a planilha do e-mail e arraste aqui, ou toque abaixo para selecionar o arquivo <code>.xlsx</code></p>
+    <label for="fileInput" class="btn">Selecionar planilha</label>
+    <input type="file" id="fileInput" accept=".xlsx,.xls">
+    <div class="sigla-row">
+      <label for="siglaInput">Sua sigla:</label>
+      <input type="text" id="siglaInput" class="sigla-input" value="IFA" maxlength="5">
+    </div>
+  </div>
+</div>
+
+<button class="reset-btn" id="resetBtn" title="Carregar outra escala">↻</button>
+
+<script>
+const $ = (sel) => document.querySelector(sel);
+const app = $("#app");
+const fileInput = $("#fileInput");
+const uploadZone = $("#uploadZone");
+const siglaInput = $("#siglaInput");
+const resetBtn = $("#resetBtn");
+const topDate = $("#topDate");
+
+// Drag & drop
+["dragenter","dragover"].forEach(ev => uploadZone.addEventListener(ev, (e) => {
+  e.preventDefault(); uploadZone.classList.add("drag");
+}));
+["dragleave","drop"].forEach(ev => uploadZone.addEventListener(ev, (e) => {
+  e.preventDefault(); uploadZone.classList.remove("drag");
+}));
+uploadZone.addEventListener("drop", (e) => {
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (file) handleFile(file);
+});
+resetBtn.addEventListener("click", () => location.reload());
+
+function handleFile(file) {
+  const sigla = (siglaInput.value || "IFA").trim().toUpperCase();
+  app.innerHTML = '<div class="loading">Lendo escala…</div>';
+
+  // Tentar extrair data do nome do arquivo: Escala_SANE_-_16_04_2026
+  const dateMatch = file.name.match(/(\d{1,2})[_\-\/\.](\d{1,2})[_\-\/\.](\d{4})/);
+  const fileDate = dateMatch ? { d: +dateMatch[1], m: +dateMatch[2], y: +dateMatch[3] } : null;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: "array" });
+      const parsed = parseEscala(wb, sigla);
+      if (fileDate) parsed.fileDate = fileDate;
+      render(parsed, sigla);
+      resetBtn.classList.add("show");
+    } catch (err) {
+      console.error(err);
+      app.innerHTML = `<div class="error-box"><strong>Erro ao ler o arquivo.</strong><br>${err.message}<br><br>Tente abrir a planilha no Excel, salvar novamente como .xlsx e recarregar.</div><div style="padding:0 20px;"><button class="btn btn-ghost" onclick="location.reload()">Tentar de novo</button></div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseEscala(wb, sigla) {
+  const sheet = wb.Sheets["Escala"] || wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+
+  // Colunas esperadas (0-indexed): 0=HOSPITAL, 1=INICIO, 2=LEITO, 3=OBS, 4=NOME, 5=PROCEDIMENTO,
+  // 6=FINAL, 7=CONVENIO, 8=MEDICO, 9=ANESTESISTA, 10=RESIDENTE, 11=FICHA_PRE, 12=LINK_FICHA
+  // 15=Anestesista (repetido), 16=Duração, 17=Residente
+
+  let currentHospital = null;
+  const surgeries = [];
+  const avisos = [];
+  const pedidos = [];
+  let plantaoInfo = null;
+  let inAvisos = false;
+  let inPedidos = false;
+  let inInfoSocios = false;
+
+  // Lista de hospitais/blocos principais observados em escalas SANE.
+  // Quando a coluna 0 contiver UM destes (isolado, sem horário), trata como cabeçalho.
+  // Caso contrário (ex: "8C", "6D", "SALA 1"), é a SALA da cirurgia.
+  const HOSPITAL_PATTERNS = /^(HDP|CINECORS|HED|PPF|HMV|HMD|STA|ICFUC|HEMO|EEF|HDVS|HSC|HNT|HSJ|CONSULT[ÓO]RIO\s*SANE|GESTÃO|SANE)\b/i;
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i] || [];
+    const c0 = (r[0] || "").toString().trim();
+    const c1 = (r[1] || "").toString().trim();
+
+    // Detectar seção DIA: IFA - XXX
+    if (c0.match(/^DIA:/i)) {
+      plantaoInfo = c0;
+      inInfoSocios = true;
+      continue;
+    }
+
+    // Detectar seção AVISOS
+    if (c0.match(/^AVISOS:?/i)) {
+      inAvisos = true; inPedidos = false; inInfoSocios = false;
+      continue;
+    }
+    // Detectar seção PEDIDOS
+    if (c0.match(/^PEDIDOS:?/i)) {
+      inPedidos = true; inAvisos = false; inInfoSocios = false;
+      continue;
+    }
+
+    // Avisos
+    if (inAvisos && c0 && c0.length > 2) {
+      avisos.push({ text: c0, mentionsMe: c0.toUpperCase().includes(sigla) });
+      continue;
+    }
+    // Pedidos
+    if (inPedidos && c0 && c0.match(/^\d+º/)) {
+      const parts = c0.split(/\s+/);
+      if (parts.length > 1) {
+        pedidos.push({ order: parts[0], sigla: parts.slice(1).join(" "), isMine: c0.toUpperCase().includes(sigla) });
+      }
+      continue;
+    }
+
+    // CABEÇALHO DE HOSPITAL: linha isolada com padrão de hospital conhecido
+    if (c0 && !c1 && !r[4] && !r[5]) {
+      if (HOSPITAL_PATTERNS.test(c0) && !inInfoSocios && !inAvisos && !inPedidos) {
+        currentHospital = c0;
+        continue;
+      }
+    }
+
+    // LINHA DE CIRURGIA: tem horário de início e procedimento/paciente
+    if (c1 && (r[4] || r[5])) {
+      // Pular linha de cabeçalho da planilha ("HOSPITAL | INICIO | PROCEDIMENTO")
+      if (c1.toUpperCase() === "INICIO" || (r[5] || "").toString().toUpperCase() === "PROCEDIMENTO") continue;
+      // c0 aqui é a SALA/ANDAR (ex: "8C", "6D", "SALA 1"), NÃO o hospital
+      const sala = c0;
+      const hospital = currentHospital || "—";
+      const anest = (r[9] || "").toString().trim().toUpperCase();
+      const resid = (r[10] || "").toString().trim().toUpperCase();
+      const obsTxt = (r[3] || "").toString().trim();
+      const isMine = (anest === sigla) || (resid === sigla) ||
+                     anest.split(/[\s\/]+/).includes(sigla) ||
+                     resid.split(/[\s\/]+/).includes(sigla);
+
+      surgeries.push({
+        hospital: hospital,
+        sala: sala,
+        start: formatTime(r[1]),
+        end: formatTime(r[6]),
+        room: (r[2] || "").toString().trim(),
+        patient: (r[4] || "").toString().trim(),
+        procedure: (r[5] || "").toString().trim(),
+        convenio: (r[7] || "").toString().trim(),
+        cirurgiao: (r[8] || "").toString().trim(),
+        anest: anest,
+        resid: resid,
+        obs: obsTxt,
+        duracao: formatTime(r[16]),
+        ficha: (r[11] || "").toString().trim(),
+        fichaLink: (r[12] || "").toString().trim(),
+        isMine: isMine,
+        isAnest: (anest === sigla || anest.split(/[\s\/]+/).includes(sigla)),
+        isResid: (resid === sigla || resid.split(/[\s\/]+/).includes(sigla))
+      });
+      // Sair de info de sócios quando voltar a ter cirurgias
+      if (!c1.startsWith("Plantão") && !c1.startsWith("Disponível")) {
+        // mantém
+      }
+    }
+  }
+
+  return { surgeries, avisos, pedidos, plantaoInfo, sigla };
+}
+
+function formatTime(v) {
+  if (!v) return "";
+  const s = v.toString().trim();
+  // pode vir como "07:30:00" ou "07:30"
+  const m = s.match(/^(\d{1,2}):(\d{2})/);
+  if (m) return `${m[1].padStart(2,"0")}:${m[2]}`;
+  return s;
+}
+
+function render(data, sigla) {
+  const mySurgeries = data.surgeries.filter(s => s.isMine);
+  const weekdayMap = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+  const monthMap = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  let dateStr = "";
+  let weekday = "";
+  if (data.fileDate) {
+    const dt = new Date(data.fileDate.y, data.fileDate.m - 1, data.fileDate.d);
+    dateStr = `${data.fileDate.d} de ${monthMap[data.fileDate.m - 1]}`;
+    weekday = weekdayMap[dt.getDay()];
+    topDate.textContent = `${String(data.fileDate.d).padStart(2,"0")}.${String(data.fileDate.m).padStart(2,"0")}.${data.fileDate.y}`;
+  } else {
+    topDate.textContent = "sem data";
+  }
+
+  let html = "";
+
+  // Cabeçalho do dia
+  html += `<div class="day-header fade-in">
+    <div class="day-label">Escala</div>
+    <div class="day-date">${dateStr || "—"}<br><span class="day-weekday">${weekday}</span></div>
+  </div>`;
+
+  // Plantão hero
+  if (data.plantaoInfo) {
+    const parts = data.plantaoInfo.replace(/^DIA:\s*/i, "").trim();
+    const isIFAPlantao = parts.toUpperCase().includes(sigla);
+    html += `<div class="plantao-hero fade-in">
+      <div class="plantao-kicker">Status do dia</div>
+      <div class="plantao-title">${isIFAPlantao ? `Você está de <em>plantão diurno</em>` : parts}</div>
+      ${isIFAPlantao ? `<div class="plantao-detail">Dupla do dia: <strong>${parts}</strong></div>` : ""}
+    </div>`;
+  }
+
+  // Seção: Minhas cirurgias
+  html += `<div class="section fade-in">
+    <div class="section-head">
+      <span class="section-num">01</span>
+      <h2 class="section-title">Suas cirurgias</h2>
+      <span class="section-count">${mySurgeries.length} ${mySurgeries.length === 1 ? "procedimento" : "procedimentos"}</span>
+    </div>`;
+
+  if (mySurgeries.length === 0) {
+    html += `<div class="empty-surg">
+      <h3>Sem cirurgias atribuídas</h3>
+      <p>Sua sigla <strong>${sigla}</strong> não aparece como anestesista ou residente em nenhuma cirurgia eletiva deste dia.${data.plantaoInfo && data.plantaoInfo.toUpperCase().includes(sigla) ? "<br>Você está cobrindo demandas do plantão." : ""}</p>
+    </div>`;
+  } else {
+    mySurgeries.sort((a,b) => a.start.localeCompare(b.start));
+    mySurgeries.forEach(s => html += renderSurgery(s, true, sigla));
+  }
+  html += `</div>`;
+
+  // Seção: Avisos
+  if (data.avisos.length > 0) {
+    html += `<div class="section fade-in">
+      <div class="section-head">
+        <span class="section-num">02</span>
+        <h2 class="section-title">Avisos</h2>
+        <span class="section-count">${data.avisos.length}</span>
+      </div>
+      <ul class="bullet-list">
+        ${data.avisos.map(a => `<li class="${a.mentionsMe ? "highlight" : ""}">${escapeHtml(a.text)}</li>`).join("")}
+      </ul>
+    </div>`;
+  }
+
+  // Seção: Pedidos
+  if (data.pedidos.length > 0) {
+    html += `<div class="section fade-in">
+      <div class="section-head">
+        <span class="section-num">03</span>
+        <h2 class="section-title">Pedidos do dia</h2>
+        <span class="section-count">${data.pedidos.length}</span>
+      </div>
+      <ul class="bullet-list">
+        ${data.pedidos.map(p => `<li class="${p.isMine ? "highlight" : ""}"><strong style="font-family:'JetBrains Mono',monospace;font-size:12px;">${p.order}</strong> ${escapeHtml(p.sigla)}</li>`).join("")}
+      </ul>
+    </div>`;
+  }
+
+  // Footer
+  html += `<div class="foot">
+    <div class="rule"></div>
+    sigla ativa: ${sigla} · ${data.surgeries.length} cirurgias total na escala
+  </div>`;
+
+  app.innerHTML = html;
+}
+
+function renderSurgery(s, mine, sigla) {
+  const myRole = s.isAnest ? "Anestesista" : (s.isResid ? "Residente" : "");
+  return `<div class="surgery ${mine ? "is-mine" : ""} fade-in">
+    <div class="surgery-top">
+      <div class="surg-time">
+        ${s.start}
+        <span class="end">até ${s.end || "—"}</span>
+      </div>
+      <div class="surg-body">
+        <div class="surg-location">
+          <span class="surg-hospital">${escapeHtml(s.hospital)}</span>
+          ${s.sala ? `<span class="surg-sala">${escapeHtml(s.sala)}</span>` : ""}
+          ${s.room ? `<span class="surg-room">leito ${escapeHtml(s.room)}</span>` : ""}
+        </div>
+        <div class="surg-proc">${escapeHtml(s.procedure || "—")}</div>
+        ${s.patient ? `<div class="surg-patient">${escapeHtml(toTitleCase(s.patient))}</div>` : ""}
+        <div class="surg-meta">
+          ${myRole ? `<span class="tag tag-role mine">${myRole}</span>` : ""}
+          ${s.cirurgiao ? `<span class="tag">Cir: ${escapeHtml(s.cirurgiao)}</span>` : ""}
+          ${s.resid ? `<span class="tag">R: ${escapeHtml(s.resid)}</span>` : ""}
+          ${s.convenio ? `<span class="tag">${escapeHtml(s.convenio)}</span>` : ""}
+          ${s.duracao ? `<span class="tag tag-dur">${escapeHtml(s.duracao)}</span>` : ""}
+        </div>
+        ${s.obs ? `<div class="surg-obs"><strong>Obs:</strong> ${escapeHtml(s.obs)}</div>` : ""}
+        ${s.fichaLink ? `<a href="${escapeHtml(s.fichaLink)}" target="_blank" class="ficha-link">📄 Ficha pré-anestésica</a>` : ""}
+      </div>
+    </div>
+  </div>`;
+}
+
+function toTitleCase(s) {
+  return s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+</script>
+
+</body>
+</html>
